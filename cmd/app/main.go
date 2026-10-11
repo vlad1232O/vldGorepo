@@ -1,36 +1,30 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
+
+	"vldGorepo/internal/handlers"
+	"vldGorepo/internal/models"
 )
 
 func main() {
-	http.HandleFunc("/", homeHandler)
-	http.HandleFunc("/about", aboutHandler)
-	http.HandleFunc("/ping", pingHandler)
+	store := models.NewExpenseStore()
+	h := handlers.New(store)
 
-	fmt.Println("Server started on http://localhost:8080")
+	mux := http.NewServeMux()
 
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		fmt.Println("Server error:", err)
-	}
-}
+	// статика: /static/style.css -> web/static/style.css
+	mux.Handle("GET /static/", http.StripPrefix("/static/",
+		http.FileServer(http.Dir("web/static"))))
 
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Welcome to Go server.")
-}
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/expenses", http.StatusSeeOther)
+	})
+	mux.HandleFunc("GET /expenses", h.List)
+	mux.HandleFunc("GET /expenses/new", h.NewForm)
+	mux.HandleFunc("POST /expenses", h.Create)
 
-func aboutHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "This is a simple HTTP server")
-}
-
-func pingHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	fmt.Fprintln(w, "pong")
+	log.Println("Сервер запущен на http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", mux))
 }
